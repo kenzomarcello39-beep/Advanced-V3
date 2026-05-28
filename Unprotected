@@ -82,9 +82,9 @@ end
 
 -- ==================== STAFF / OWNER DETECTOR (ANTI-BAN SYSTEM) ====================
 local staffList = {
-    [8] = "Staff Angel",
-    [10] = "Staff Maarz",
-    [19] = "Owner meckymoo"
+    [6094879206] = "Staff Angel",
+    [6094879206] = "Staff Maarz",
+    [6094879206] = "Owner Lol"
 }
 
 local function periksaStaff(player)
