@@ -1,0 +1,499 @@
+-- ====================================================================
+-- ADVANCED DR GUI PRO (FULL EDITION - MUSIC, SFX & STAFF DETECTOR)
+-- ====================================================================
+
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+local LocalPlayer = Players.LocalPlayer
+local targetIndex = 1
+local targetPlayer = LocalPlayer
+
+-- Tetapan Font Global
+local FontUtama = Enum.Font.Fantasy
+
+-- Auto-detect GUI parent
+local guiParent = nil
+local success = pcall(function() guiParent = CoreGui end)
+if not success or not guiParent then 
+    guiParent = LocalPlayer:WaitForChild("PlayerGui") 
+end
+
+-- Bersihkan GUI lama jika ada
+for _, v in pairs(guiParent:GetChildren()) do
+    if v.Name == "AdvancedDRGuiPro" then
+        v:Destroy()
+    end
+end
+
+-- ScreenGui Utama
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AdvancedDRGuiPro"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = guiParent
+
+-- ==================== SISTEM AUDIO (SFX & MUSIC) ====================
+local function buatSound(id, loop, volume)
+    local s = Instance.new("Sound")
+    s.SoundId = "rbxassetid://" .. id
+    s.Looped = loop
+    s.Volume = volume
+    s.Parent = ScreenGui
+    return s
+end
+
+local SFX_Action = buatSound("122955642965395", false, 1)
+local SFX_Page2  = buatSound("117020413851255", false, 1)
+local SFX_Alarm  = buatSound("131407039245636", true, 10) -- Kuat & Looped
+local MusicPlayer = buatSound("", true, 2.5) -- Volume ditingkatkan ke 2.5 (Lebih Besar)
+
+-- ==================== SYSTEM DRAGGING BARU ====================
+local function buatDraggable(objekSentuh, objekGerak)
+    local dragging, dragInput, dragStart, startPos
+
+    objekSentuh.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; dragStart = input.Position; startPos = objekGerak.Position
+            if input.UserInputType == Enum.UserInputType.Touch then
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then dragging = false end
+                end)
+            end
+        end
+    end)
+    objekSentuh.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            objekGerak.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    objekSentuh.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
+    end)
+end
+
+-- ==================== STAFF / OWNER DETECTOR (ANTI-BAN SYSTEM) ====================
+local staffList = {
+    [8] = "Staff Angel",
+    [10] = "Staff Maarz",
+    [19] = "Owner meckymoo"
+}
+
+local function periksaStaff(player)
+    if staffList[player.UserId] then
+        -- Mainkan Bunyi Penggera Sangat Kuat
+        SFX_Alarm:Play()
+        
+        -- Tunggu 1.5 saat agar pengguna dengar amaran sebelum dikick
+        task.wait(1.5)
+        
+        -- Kick Player demi keselamatan (Alasan dalam Bahasa Inggeris)
+        LocalPlayer:Kick("\n⚠️ SECURITY ALERT ⚠️\n\n" .. staffList[player.UserId] .. " has joined the server!\n\nAuto-disconnect initiated to protect your account from a potential ban.")
+    end
+end
+
+Players.PlayerAdded:Connect(periksaStaff)
+for _, p in pairs(Players:GetPlayers()) do
+    periksaStaff(p) -- Periksa jika mereka sudah ada dalam pelayan ketika script diinject
+end
+
+-- ==================== UI ELEMENTS ====================
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Size = UDim2.new(0, 44, 0, 44)
+ToggleButton.Position = UDim2.new(0, 20, 0, 20)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+ToggleButton.Text = "" -- Membuang teks "?" asal
+ToggleButton.Parent = ScreenGui
+Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(1, 0)
+
+-- Memasukkan Custom Icon Gambar pada Toggle Button
+local ToggleIcon = Instance.new("ImageLabel")
+ToggleIcon.Size = UDim2.new(1, 0, 1, 0)
+ToggleIcon.BackgroundTransparency = 1
+ToggleIcon.Image = "rbxthumb://type=Asset&id=97883323610909&w=150&h=150"
+ToggleIcon.Parent = ToggleButton
+Instance.new("UICorner", ToggleIcon).CornerRadius = UDim.new(1, 0)
+
+local ToggleStroke = Instance.new("UIStroke")
+ToggleStroke.Color = Color3.fromRGB(70, 70, 90)
+ToggleStroke.Thickness = 1.5
+ToggleStroke.Parent = ToggleButton
+buatDraggable(ToggleButton, ToggleButton)
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 360, 0, 270)
+MainFrame.Position = UDim2.new(0.5, -180, 0.5, -135)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = false 
+MainFrame.Visible = false
+MainFrame.Parent = ScreenGui
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+
+-- Memasukkan Custom Background Image pada GUI Utama
+local MainBg = Instance.new("ImageLabel")
+MainBg.Name = "MainBg"
+MainBg.Size = UDim2.new(1, 0, 1, 0)
+MainBg.BackgroundTransparency = 1
+MainBg.Image = "rbxthumb://type=Asset&id=5223203930&w=150&h=150"
+MainBg.Parent = MainFrame
+Instance.new("UICorner", MainBg).CornerRadius = UDim.new(0, 10)
+
+local Topbar = Instance.new("Frame")
+Topbar.Size = UDim2.new(1, 0, 0, 34)
+Topbar.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+Topbar.BackgroundTransparency = 0.3 -- Sedikit lutsinar supaya nampak background di belakang
+Topbar.Parent = MainFrame
+Instance.new("UICorner", Topbar).CornerRadius = UDim.new(0, 10)
+local TopbarPatch = Instance.new("Frame")
+TopbarPatch.Size = UDim2.new(1, 0, 0, 8)
+TopbarPatch.Position = UDim2.new(0, 0, 1, -8)
+TopbarPatch.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+TopbarPatch.BackgroundTransparency = 0.3
+TopbarPatch.BorderSizePixel = 0
+TopbarPatch.Parent = Topbar
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -45, 1, 0)
+Title.Position = UDim2.new(0, 12, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "GIXESH PANEL | Advanced"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = FontUtama
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = Topbar
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 34, 0, 34)
+CloseBtn.Position = UDim2.new(1, -34, 0, 0)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Text = "✕"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+CloseBtn.Font = FontUtama
+CloseBtn.TextSize = 14
+CloseBtn.Parent = Topbar
+buatDraggable(Topbar, MainFrame)
+
+-- Sidebar (Menu Navigasi Halaman)
+local Sidebar = Instance.new("Frame")
+Sidebar.Size = UDim2.new(0, 90, 1, -34)
+Sidebar.Position = UDim2.new(0, 0, 0, 34)
+Sidebar.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+Sidebar.BackgroundTransparency = 0.3
+Sidebar.BorderSizePixel = 0
+Sidebar.Parent = MainFrame
+
+local function buatTab(text, yPos)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 0, 30)
+    btn.Position = UDim2.new(0, 5, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.Font = FontUtama
+    btn.TextSize = 12
+    btn.Parent = Sidebar
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
+    return btn
+end
+
+local Tab1Btn = buatTab("Page 1", 12)
+Tab1Btn.BackgroundColor3 = Color3.fromRGB(55, 55, 180) -- Aktif default
+Tab1Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+local Tab2Btn = buatTab("Page 2", 48)
+local Tab3Btn = buatTab("Music", 84)
+
+-- Area Konten Utama
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, -90, 1, -34)
+Content.Position = UDim2.new(0, 90, 0, 34)
+Content.BackgroundTransparency = 1
+Content.Parent = MainFrame
+
+-- ==================== PANEL PREVIEW AVATAR PLAYER ====================
+local PreviewFrame = Instance.new("Frame")
+PreviewFrame.Size = UDim2.new(0, 85, 0, 110)
+PreviewFrame.Position = UDim2.new(1, 4, 0, 38) 
+PreviewFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+PreviewFrame.BackgroundTransparency = 1 
+PreviewFrame.Parent = MainFrame
+Instance.new("UICorner", PreviewFrame).CornerRadius = UDim.new(0, 8)
+
+local AvatarImage = Instance.new("ImageLabel")
+AvatarImage.Size = UDim2.new(0, 55, 0, 55)
+AvatarImage.Position = UDim2.new(0.5, -27.5, 0, 12)
+AvatarImage.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+AvatarImage.ImageTransparency = 1
+AvatarImage.Image = ""
+AvatarImage.Parent = PreviewFrame
+Instance.new("UICorner", AvatarImage).CornerRadius = UDim.new(0, 6)
+
+local PreviewName = Instance.new("TextLabel")
+PreviewName.Size = UDim2.new(1, -8, 0, 25)
+PreviewName.Position = UDim2.new(0, 4, 1, -28)
+PreviewName.BackgroundTransparency = 1
+PreviewName.Text = "None"
+PreviewName.TextColor3 = Color3.fromRGB(255, 255, 255)
+PreviewName.Font = FontUtama
+PreviewName.TextSize = 10
+PreviewName.TextWrapped = true
+PreviewName.TextTransparency = 1
+PreviewName.Parent = PreviewFrame
+
+local function updateAvatarPreview()
+    if targetPlayer then
+        PreviewName.Text = targetPlayer.DisplayName
+        task.spawn(function()
+            local content, isReady = Players:GetUserThumbnailAsync(targetPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+            if isReady then AvatarImage.Image = content end
+        end)
+    else
+        PreviewName.Text = "No Player"; AvatarImage.Image = ""
+    end
+end
+
+-- ==================== HALAMAN 1 (PAGE 1) ====================
+local Page1 = Instance.new("Frame")
+Page1.Size = UDim2.new(1, 0, 1, 0)
+Page1.BackgroundTransparency = 1
+Page1.Parent = Content
+
+-- Pemilih Player (Selector Tetap Di Atas)
+local SelectorFrame = Instance.new("Frame")
+SelectorFrame.Size = UDim2.new(1, -16, 0, 28)
+SelectorFrame.Position = UDim2.new(0, 8, 0, 10)
+SelectorFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+SelectorFrame.Parent = Page1
+Instance.new("UICorner", SelectorFrame).CornerRadius = UDim.new(0, 5)
+
+local TargetLabel = Instance.new("TextLabel")
+TargetLabel.Size = UDim2.new(1, -56, 1, 0)
+TargetLabel.Position = UDim2.new(0, 28, 0, 0)
+TargetLabel.BackgroundTransparency = 1
+TargetLabel.Text = "Loading..."
+TargetLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TargetLabel.Font = FontUtama
+TargetLabel.TextSize = 12
+TargetLabel.Parent = SelectorFrame
+
+local PrevBtn = Instance.new("TextButton")
+PrevBtn.Size = UDim2.new(0, 24, 1, 0)
+PrevBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+PrevBtn.Text = "◀"
+PrevBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+PrevBtn.Font = FontUtama; PrevBtn.TextSize = 11
+PrevBtn.Parent = SelectorFrame
+Instance.new("UICorner", PrevBtn).CornerRadius = UDim.new(0, 5)
+
+local NextBtn = PrevBtn:Clone()
+NextBtn.Position = UDim2.new(1, -24, 0, 0)
+NextBtn.Text = "▶"
+NextBtn.Parent = SelectorFrame
+
+-- Menggunakan ScrollingFrame supaya butang yang banyak muat & boleh dikesot ke bawah
+local Page1Scroll = Instance.new("ScrollingFrame")
+Page1Scroll.Size = UDim2.new(1, 0, 1, -48)
+Page1Scroll.Position = UDim2.new(0, 0, 0, 44)
+Page1Scroll.BackgroundTransparency = 1
+Page1Scroll.BorderSizePixel = 0
+Page1Scroll.CanvasSize = UDim2.new(0, 0, 0, 440) -- Panjang ditingkatkan ke 440 untuk butang baru
+Page1Scroll.ScrollBarThickness = 3
+Page1Scroll.Parent = Page1
+
+local function gantiTarget()
+    local semuaPlayer = Players:GetPlayers()
+    if #semuaPlayer == 0 then return end
+    if targetIndex > #semuaPlayer then targetIndex = 1 end
+    if targetIndex < 1 then targetIndex = #semuaPlayer end
+    targetPlayer = semuaPlayer[targetIndex]
+    if targetPlayer then
+        TargetLabel.Text = "Target: " .. targetPlayer.Name
+        updateAvatarPreview()
+    end
+end
+
+PrevBtn.MouseButton1Click:Connect(function() targetIndex = targetIndex - 1; gantiTarget() end)
+NextBtn.MouseButton1Click:Connect(function() targetIndex = targetIndex + 1; gantiTarget() end)
+Players.PlayerAdded:Connect(gantiTarget); Players.PlayerRemoving:Connect(gantiTarget)
+gantiTarget()
+
+local function buatTombolAksi(text, yPos, parent)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -16, 0, 28)
+    btn.Position = UDim2.new(0, 8, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
+    btn.BackgroundTransparency = 0.15
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(240, 240, 240)
+    btn.Font = FontUtama
+    btn.TextSize = 12
+    btn.Parent = parent
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
+    
+    btn.MouseEnter:Connect(function() TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 50, 60)}):Play() end)
+    btn.MouseLeave:Connect(function() TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(40, 40, 48)}):Play() end)
+    
+    btn.MouseButton1Click:Connect(function()
+        SFX_Action:Play()
+    end)
+    return btn
+end
+
+-- Butang-Butang Page 1
+local Button1        = buatTombolAksi("Set Cooldowns", 5, Page1Scroll)
+local Button2        = buatTombolAksi("Infinite Ultimate", 40, Page1Scroll)
+local Button3        = buatTombolAksi("God Mode", 75, Page1Scroll)
+local Button4        = buatTombolAksi("Set Health", 110, Page1Scroll)
+local Button5        = buatTombolAksi("Give Ultimate", 145, Page1Scroll)
+local ButtonBringAll = buatTombolAksi("Bring All Players", 180, Page1Scroll)
+local ButtonDummy    = buatTombolAksi("Give Dummy Display", 215, Page1Scroll)
+local ButtonFlight   = buatTombolAksi("Give Flight", 250, Page1Scroll)
+local ButtonUngod    = buatTombolAksi("Ungod", 285, Page1Scroll)
+local ButtonKick     = buatTombolAksi("Kick Player", 320, Page1Scroll)
+
+-- 2 Butang Baharu Ditambah Di Sini (Page 1)
+local ButtonTo       = buatTombolAksi("Teleport To Player", 355, Page1Scroll)
+local ButtonRespawn  = buatTombolAksi("Respawn Player", 390, Page1Scroll)
+
+local function kirimRemote(commandName, target, ekstraData)
+    task.spawn(function()
+        pcall(function()
+            ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Commands"):WaitForChild("Send"):FireServer(commandName, target, ekstraData)
+        end)
+    end)
+end
+
+Button1.MouseButton1Click:Connect(function() kirimRemote("Set Cooldowns", targetPlayer, {Value = true}) end)
+Button2.MouseButton1Click:Connect(function() kirimRemote("Infinite Ultimate", targetPlayer, {Value = true}) end)
+Button3.MouseButton1Click:Connect(function() kirimRemote("God", targetPlayer, {}) end)
+Button4.MouseButton1Click:Connect(function() kirimRemote("Set Health", targetPlayer, {String = ""}) end)
+Button5.MouseButton1Click:Connect(function() kirimRemote("Give Ultimate", targetPlayer, {}) end) 
+
+ButtonBringAll.MouseButton1Click:Connect(function() 
+    kirimRemote("Bring", "All", {}) 
+end)
+
+ButtonDummy.MouseButton1Click:Connect(function() 
+    if targetPlayer then kirimRemote("Dummy Display", targetPlayer, {Value = true}) end
+end)
+
+ButtonFlight.MouseButton1Click:Connect(function() 
+    if targetPlayer then kirimRemote("Flight", targetPlayer, {Value = true}) end
+end)
+
+ButtonUngod.MouseButton1Click:Connect(function() 
+    if targetPlayer then kirimRemote("Ungod", targetPlayer, {}) end
+end)
+
+ButtonKick.MouseButton1Click:Connect(function() 
+    if targetPlayer then kirimRemote("Kick", targetPlayer, {Confirm = true}) end
+end)
+
+-- Fungsi 2 Butang Baharu
+ButtonTo.MouseButton1Click:Connect(function()
+    if targetPlayer then kirimRemote("To", targetPlayer, {}) end
+end)
+
+ButtonRespawn.MouseButton1Click:Connect(function()
+    if targetPlayer then kirimRemote("Respawn", targetPlayer, {}) end
+end)
+
+-- ==================== HALAMAN 2 (PAGE 2) ====================
+local Page2 = Instance.new("Frame")
+Page2.Size = UDim2.new(1, 0, 1, 0)
+Page2.BackgroundTransparency = 1
+Page2.Visible = false
+Page2.Parent = Content
+
+local ButtonJimpee = buatTombolAksi("Switch Character: Jimpee", 12, Page2)
+local ButtonHornet = buatTombolAksi("Switch Character: Hornet", 47, Page2)
+
+ButtonJimpee.MouseButton1Click:Connect(function()
+    task.spawn(function() pcall(function()
+        ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Combat"):WaitForChild("SwitchCharacter"):FireServer("Jimpee", "17189234841")
+    end) end)
+end)
+
+ButtonHornet.MouseButton1Click:Connect(function()
+    task.spawn(function() pcall(function()
+        ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Combat"):WaitForChild("SwitchCharacter"):FireServer("Hornet", 79119271285676)
+    end) end)
+end)
+
+-- ==================== HALAMAN 3 (MUSIC PAGE) ====================
+local Page3 = Instance.new("Frame")
+Page3.Size = UDim2.new(1, 0, 1, 0)
+Page3.BackgroundTransparency = 1
+Page3.Visible = false
+Page3.Parent = Content
+
+local Music1 = buatTombolAksi("No Batidao", 12, Page3)
+local Music2 = buatTombolAksi("Aria Mathematics", 47, Page3)
+local Music3 = buatTombolAksi("Golden Brown x Love Story", 82, Page3)
+
+-- 2 Muzik Baharu Ditambah Di Sini
+local Music4 = buatTombolAksi("Phantasm", 117, Page3)
+local Music5 = buatTombolAksi("Aura Do Brasil", 152, Page3)
+
+local MusicStop = buatTombolAksi("⏹️ Stop Music", 187, Page3)
+MusicStop.BackgroundColor3 = Color3.fromRGB(150, 50, 50) 
+
+local function mainkanMuzik(id)
+    MusicPlayer:Stop()
+    MusicPlayer.SoundId = "rbxassetid://" .. id
+    MusicPlayer:Play()
+end
+
+Music1.MouseButton1Click:Connect(function() mainkanMuzik("116690587449059") end)
+Music2.MouseButton1Click:Connect(function() mainkanMuzik("114057111548622") end)
+Music3.MouseButton1Click:Connect(function() mainkanMuzik("120313972450310") end)
+Music4.MouseButton1Click:Connect(function() mainkanMuzik("140736185536900") end)
+Music5.MouseButton1Click:Connect(function() mainkanMuzik("138658160401701") end)
+MusicStop.MouseButton1Click:Connect(function() MusicPlayer:Stop() end)
+
+-- ==================== LOGIKA ANIMASI & NAVIGASI GUI ====================
+local function tukarTab(tabAktif, mukaSurat)
+    Page1.Visible = false; Page2.Visible = false; Page3.Visible = false
+    mukaSurat.Visible = true
+    
+    local tabTidakAktif = Color3.fromRGB(40, 40, 45)
+    local teksTidakAktif = Color3.fromRGB(200, 200, 200)
+    TweenService:Create(Tab1Btn, TweenInfo.new(0.2), {BackgroundColor3 = tabTidakAktif, TextColor3 = teksTidakAktif}):Play()
+    TweenService:Create(Tab2Btn, TweenInfo.new(0.2), {BackgroundColor3 = tabTidakAktif, TextColor3 = teksTidakAktif}):Play()
+    TweenService:Create(Tab3Btn, TweenInfo.new(0.2), {BackgroundColor3 = tabTidakAktif, TextColor3 = teksTidakAktif}):Play()
+    
+    TweenService:Create(tabAktif, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(55, 55, 180), TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+end
+
+Tab1Btn.MouseButton1Click:Connect(function() tukarTab(Tab1Btn, Page1) end)
+Tab2Btn.MouseButton1Click:Connect(function()
+    tukarTab(Tab2Btn, Page2)
+    SFX_Page2:Play() 
+end)
+Tab3Btn.MouseButton1Click:Connect(function() tukarTab(Tab3Btn, Page3) end)
+
+local menuTerbuka = false
+local function setMenu(state)
+    menuTerbuka = state
+    if menuTerbuka then
+        MainFrame.Visible = true
+        MainFrame.Size = UDim2.new(0, 0, 0, 0)
+        TweenService:Create(MainFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 360, 0, 270)}):Play()
+        task.wait(0.15)
+        TweenService:Create(PreviewFrame, TweenInfo.new(0.25), {BackgroundTransparency = 0}):Play()
+        TweenService:Create(AvatarImage, TweenInfo.new(0.25), {ImageTransparency = 0}):Play()
+        TweenService:Create(PreviewName, TweenInfo.new(0.25), {TextTransparency = 0}):Play()
+    else
+        TweenService:Create(PreviewFrame, TweenInfo.new(0.15), {BackgroundTransparency = 1}):
